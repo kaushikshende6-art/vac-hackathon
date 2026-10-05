@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: trackx
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DEVICE_OFFLINE_TIMEOUT
+        value: 60
+      - key: GEOFENCE_ALERT_COOLDOWN
+        value: 120

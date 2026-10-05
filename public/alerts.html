@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRACKX — Safety Alert & Incident Center</title>
+  <meta name="description" content="Centralized dispatch incident center for SOS alerts, geofence breaches, and MPU6050 impact telemetry.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .filter-btn {
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    .filter-btn.active {
+      background: var(--accent-cyan);
+      color: #0f172a;
+      border-color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-logo">🛰️</div>
+        <div class="brand-info">
+          <h1>TRACKX</h1>
+          <span>Smart IoT Safety</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-section-title">Telemetry & Map</div>
+        <a href="/dashboard" class="nav-item">
+          <span class="icon">📊</span> Dashboard
+        </a>
+        <a href="/tracking" class="nav-item">
+          <span class="icon">📍</span> Live Tracking
+        </a>
+        <a href="/navigation" class="nav-item">
+          <span class="icon">🧭</span> Navigation
+        </a>
+
+        <div class="nav-section-title">Safety & Fleet</div>
+        <a href="/history" class="nav-item">
+          <span class="icon">📜</span> Trip History
+        </a>
+        <a href="/alerts" class="nav-item active">
+          <span class="icon">🚨</span> Safety & Alerts
+          <span id="sidebarAlertBadge" class="nav-badge danger" style="display: none;">0</span>
+        </a>
+        <a href="/geofence" class="nav-item">
+          <span class="icon">⭕</span> Geofence
+        </a>
+
+        <div class="nav-section-title">Hardware</div>
+        <a href="/device" class="nav-item">
+          <span class="icon">⚡</span> Device Telemetry
+        </a>
+        <a href="/settings" class="nav-item">
+          <span class="icon">⚙️</span> Settings
+        </a>
+      </nav>
+
+      <div style="padding: 16px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-dim);">
+        <div>Incident Severity Filter</div>
+        <div style="color: var(--accent-rose); font-weight: 600; margin-top: 2px;">SOS / GEOFENCE / MOTION</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      
+      <!-- Top Emergency Banner -->
+      <div id="emergencyBanner" class="emergency-banner">
+        <div class="banner-content">
+          <div class="banner-pulse"></div>
+          <span id="emergencyBannerMsg">EMERGENCY SOS ACTIVE</span>
+        </div>
+        <div class="banner-actions">
+          <button class="banner-btn" onclick="App.acknowledgeBannerAlert()">Acknowledge</button>
+        </div>
+      </div>
+
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+          <div class="page-title">Safety & Incident Center</div>
+        </div>
+
+        <div class="topbar-right">
+          <div id="deviceStatusPill" class="status-pill online">
+            <span class="status-dot"></span> ONLINE
+          </div>
+
+          <div id="topbarClock" class="telemetry-chip" style="font-weight: 600;">
+            12:45:00
+          </div>
+
+          <button id="headerSosBtn" class="sos-header-btn">
+            🚨 SOS
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Alerts Content -->
+      <main class="content-body">
+        
+        <!-- Controls & Filter Toolbar -->
+        <div class="card-panel" style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button class="filter-btn active" data-filter="ALL">All Incidents</button>
+            <button class="filter-btn" data-filter="SOS">🚨 Emergency SOS</button>
+            <button class="filter-btn" data-filter="GEOFENCE">⭕ Geofence Breach</button>
+            <button class="filter-btn" data-filter="MOTION">💥 Motion & Impact</button>
+            <button class="filter-btn" data-filter="SYSTEM">ℹ️ System Info</button>
+
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-left: 12px; cursor: pointer;">
+              <input type="checkbox" id="chkUnackOnly" style="accent-color: var(--accent-cyan);">
+              Unacknowledged Only
+            </label>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button id="btnTriggerManualSos" class="btn btn-danger" style="font-size: 11px; padding: 6px 12px;">🚨 Trigger Manual Alert</button>
+            <button id="btnAckAllAlerts" class="btn btn-secondary" style="font-size: 11px; padding: 6px 12px;">✓ Acknowledge All</button>
+          </div>
+        </div>
+
+        <!-- Master Incidents Table -->
+        <div class="card-panel">
+          <div class="card-title">
+            <span>🛡️ Incident Audit Trail</span>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Device ID</th>
+                  <th>Incident Description</th>
+                  <th>Coordinates</th>
+                  <th>Timestamp</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="alertsMasterTableBody">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                    Querying incident database...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Client-side Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/demo.js"></script>
+  <script src="/js/alerts.js"></script>
+</body>
+</html>

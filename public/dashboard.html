@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRACKX — Smart GPS Live Tracking & Safety Platform</title>
+  <meta name="description" content="Real-time IoT GPS Tracking, Geofencing, Motion Sensing, and Emergency Safety Platform for ESP8266 NodeMCU.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Global App Shell -->
+  <div class="app-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-logo">🛰️</div>
+        <div class="brand-info">
+          <h1>TRACKX</h1>
+          <span>Smart IoT Safety</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-section-title">Telemetry & Map</div>
+        <a href="/dashboard" class="nav-item active">
+          <span class="icon">📊</span> Dashboard
+        </a>
+        <a href="/tracking" class="nav-item">
+          <span class="icon">📍</span> Live Tracking
+        </a>
+        <a href="/navigation" class="nav-item">
+          <span class="icon">🧭</span> Navigation
+        </a>
+
+        <div class="nav-section-title">Safety & Fleet</div>
+        <a href="/history" class="nav-item">
+          <span class="icon">📜</span> Trip History
+        </a>
+        <a href="/alerts" class="nav-item">
+          <span class="icon">🚨</span> Safety & Alerts
+          <span id="sidebarAlertBadge" class="nav-badge danger" style="display: none;">0</span>
+        </a>
+        <a href="/geofence" class="nav-item">
+          <span class="icon">⭕</span> Geofence
+        </a>
+
+        <div class="nav-section-title">Hardware</div>
+        <a href="/device" class="nav-item">
+          <span class="icon">⚡</span> Device Telemetry
+        </a>
+        <a href="/settings" class="nav-item">
+          <span class="icon">⚙️</span> Settings
+        </a>
+      </nav>
+
+      <div style="padding: 16px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-dim);">
+        <div>ESP8266 NodeMCU + NEO-6M</div>
+        <div style="color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">MPU6050 Motion Active</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      
+      <!-- Critical Emergency Flash Banner -->
+      <div id="emergencyBanner" class="emergency-banner">
+        <div class="banner-content">
+          <div class="banner-pulse"></div>
+          <span id="emergencyBannerMsg">EMERGENCY SOS BROADCAST ACTIVE</span>
+        </div>
+        <div class="banner-actions">
+          <a href="/alerts" class="banner-btn">View Location</a>
+          <button class="banner-btn" onclick="App.acknowledgeBannerAlert()">Acknowledge</button>
+        </div>
+      </div>
+
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+          <div class="page-title">Operations Dashboard</div>
+
+          <div class="device-picker">
+            <span>Tracker:</span>
+            <select id="topbarDeviceSelect">
+              <option value="TRACKX-01">TRACKX-01 (Primary NodeMCU)</option>
+              <option value="TRACKX-02">TRACKX-02 (Secondary Unit)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div id="deviceStatusPill" class="status-pill online">
+            <span class="status-dot"></span> ONLINE
+          </div>
+
+          <div id="satellitesChip" class="telemetry-chip">
+            📡 <span>8 SATS</span>
+          </div>
+
+          <div id="batteryChip" class="telemetry-chip">
+            🔋 <span>98%</span>
+          </div>
+
+          <div id="topbarClock" class="telemetry-chip" style="font-weight: 600;">
+            12:45:00
+          </div>
+
+          <button id="headerSosBtn" class="sos-header-btn" title="Simulate / Trigger SOS Alert">
+            🚨 SOS
+          </button>
+        </div>
+      </header>
+
+      <!-- Dashboard Body -->
+      <main class="content-body">
+        
+        <!-- Hackathon Interactive Demo Control Bar -->
+        <div class="demo-bar">
+          <div class="demo-title">
+            <span>🧪 Hackathon Demo Controls</span>
+            <span style="font-size: 11px; color: var(--text-dim); text-transform: none; font-weight: 400;">(Real ESP8266 REST API Emulation)</span>
+          </div>
+          <div class="demo-actions">
+            <button id="demoStepBtn" class="demo-btn">⏭️ Step Next Point</button>
+            <button id="demoAutoPlayBtn" class="demo-btn">▶️ Auto-Drive Simulation</button>
+            <button id="demoBreachBtn" class="demo-btn btn-warning">⚠️ Force Geofence Breach</button>
+            <button id="demoImpactBtn" class="demo-btn btn-danger">💥 MPU6050 Impact</button>
+            <button id="demoSosBtn" class="demo-btn btn-danger">🚨 Push SOS Button</button>
+            <button id="demoResetBtn" class="demo-btn">🔄 Reset Route</button>
+          </div>
+        </div>
+
+        <!-- Telemetry Metrics Grid -->
+        <div class="metrics-grid">
+          
+          <!-- Speed Card -->
+          <div class="metric-card" style="--card-accent: var(--accent-cyan);">
+            <div class="metric-header">
+              <span class="metric-label">Current Speed</span>
+              <span class="metric-icon">⚡</span>
+            </div>
+            <div id="cardSpeed" class="metric-value">
+              0 <span class="metric-unit">km/h</span>
+            </div>
+            <div id="cardMaxSpeed" class="metric-sub">
+              Max: 0 km/h • Avg: 0 km/h
+            </div>
+          </div>
+
+          <!-- Distance Travelled Today -->
+          <div class="metric-card" style="--card-accent: var(--accent-emerald);">
+            <div class="metric-header">
+              <span class="metric-label">Distance Today</span>
+              <span class="metric-icon">🛣️</span>
+            </div>
+            <div id="cardDistance" class="metric-value">
+              0.00 <span class="metric-unit">km</span>
+            </div>
+            <div class="metric-sub">
+              Computed via Haversine
+            </div>
+          </div>
+
+          <!-- Satellites & Accuracy -->
+          <div class="metric-card" style="--card-accent: var(--accent-purple);">
+            <div class="metric-header">
+              <span class="metric-label">GPS Satellites</span>
+              <span class="metric-icon">🛰️</span>
+            </div>
+            <div id="cardSatellites" class="metric-value">
+              8 <span class="metric-unit">Sats • ±2.8m</span>
+            </div>
+            <div class="metric-sub">
+              NEO-6M Active Fix
+            </div>
+          </div>
+
+          <!-- Coordinates -->
+          <div class="metric-card" style="--card-accent: var(--accent-blue);">
+            <div class="metric-header">
+              <span class="metric-label">Coordinates</span>
+              <span class="metric-icon">🌐</span>
+            </div>
+            <div id="cardCoordinates" class="metric-value" style="font-size: 20px; font-family: var(--font-mono);">
+              21.1458, 79.0882
+            </div>
+            <div id="cardLastUpdate" class="metric-sub">
+              12:42:18 (Just now)
+            </div>
+          </div>
+
+          <!-- Motion & Impact Status -->
+          <div class="metric-card" style="--card-accent: var(--accent-amber);">
+            <div class="metric-header">
+              <span class="metric-label">Motion (MPU6050)</span>
+              <span class="metric-icon">📐</span>
+            </div>
+            <div id="cardMotion" class="metric-value" style="font-size: 18px;">
+              <span class="badge badge-info">NORMAL (0.98G)</span>
+            </div>
+            <div class="metric-sub">
+              6-Axis Accel / Gyro
+            </div>
+          </div>
+
+          <!-- Safe Zone Geofence -->
+          <div class="metric-card" style="--card-accent: var(--accent-rose);">
+            <div class="metric-header">
+              <span class="metric-label">Safe Zone Status</span>
+              <span class="metric-icon">⭕</span>
+            </div>
+            <div id="cardGeofenceStatus" class="metric-value" style="font-size: 16px;">
+              <span class="badge badge-success">INSIDE</span>
+            </div>
+            <div class="metric-sub">
+              College Campus Perimeter
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Live Leaflet Map Container -->
+        <div class="card-panel" style="padding: 0; overflow: hidden; margin-bottom: 24px;">
+          <div style="padding: 16px 20px; background-color: var(--bg-card); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+              <span>🗺️ Live GPS Tracking Canvas</span>
+              <span class="badge badge-info">Real-time Stream</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <a href="/tracking" class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px;">Full-Screen Mode</a>
+            </div>
+          </div>
+
+          <div class="map-container" style="height: 480px;">
+            <div id="map"></div>
+          </div>
+        </div>
+
+        <!-- Recent Safety Alerts Table -->
+        <div class="card-panel">
+          <div class="card-title">
+            <span>🚨 Safety & Alert Event Log</span>
+            <div style="display: flex; gap: 10px;">
+              <button id="audioToggleBtn" class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px;">🔊 Audio Alert: ON</button>
+              <a href="/alerts" class="btn btn-secondary" style="font-size: 12px; padding: 5px 12px;">View All Alerts</a>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Event Description</th>
+                  <th>Coordinates</th>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="alertsTableBody">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">
+                    Connecting to TRACKX telemetry stream...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- Footer -->
+      <footer style="padding: 16px 24px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <b>TRACKX</b> — Smart Live Location & Safety Platform • Hackathon Edition
+        </div>
+        <div>
+          ESP8266 REST API: <code style="color: var(--accent-cyan); font-family: var(--font-mono);">POST /api/location</code>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Client-side Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/demo.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

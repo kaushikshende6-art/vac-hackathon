@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRACKX — System Settings & Hardware Config</title>
+  <meta name="description" content="Configure backend API endpoints, Render URLs, and export C++ firmware configs for NodeMCU ESP8266.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-logo">🛰️</div>
+        <div class="brand-info">
+          <h1>TRACKX</h1>
+          <span>Smart IoT Safety</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-section-title">Telemetry & Map</div>
+        <a href="/dashboard" class="nav-item">
+          <span class="icon">📊</span> Dashboard
+        </a>
+        <a href="/tracking" class="nav-item">
+          <span class="icon">📍</span> Live Tracking
+        </a>
+        <a href="/navigation" class="nav-item">
+          <span class="icon">🧭</span> Navigation
+        </a>
+
+        <div class="nav-section-title">Safety & Fleet</div>
+        <a href="/history" class="nav-item">
+          <span class="icon">📜</span> Trip History
+        </a>
+        <a href="/alerts" class="nav-item">
+          <span class="icon">🚨</span> Safety & Alerts
+          <span id="sidebarAlertBadge" class="nav-badge danger" style="display: none;">0</span>
+        </a>
+        <a href="/geofence" class="nav-item">
+          <span class="icon">⭕</span> Geofence
+        </a>
+
+        <div class="nav-section-title">Hardware</div>
+        <a href="/device" class="nav-item">
+          <span class="icon">⚡</span> Device Telemetry
+        </a>
+        <a href="/settings" class="nav-item active">
+          <span class="icon">⚙️</span> Settings
+        </a>
+      </nav>
+
+      <div style="padding: 16px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-dim);">
+        <div>API Configurator</div>
+        <div style="color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">Render / Localhost Compatible</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      
+      <!-- Top Emergency Banner -->
+      <div id="emergencyBanner" class="emergency-banner">
+        <div class="banner-content">
+          <div class="banner-pulse"></div>
+          <span id="emergencyBannerMsg">EMERGENCY SOS ACTIVE</span>
+        </div>
+        <div class="banner-actions">
+          <button class="banner-btn" onclick="App.acknowledgeBannerAlert()">Acknowledge</button>
+        </div>
+      </div>
+
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+          <div class="page-title">Settings & Hardware Configuration</div>
+        </div>
+
+        <div class="topbar-right">
+          <div id="deviceStatusPill" class="status-pill online">
+            <span class="status-dot"></span> ONLINE
+          </div>
+
+          <div id="topbarClock" class="telemetry-chip" style="font-weight: 600;">
+            12:45:00
+          </div>
+
+          <button id="headerSosBtn" class="sos-header-btn">
+            🚨 SOS
+          </button>
+        </div>
+      </header>
+
+      <!-- Settings Content Body -->
+      <main class="content-body">
+        
+        <div class="layout-split">
+          
+          <!-- Left: Platform Settings Form -->
+          <div>
+            <div class="card-panel">
+              <div class="card-title">🌐 Platform & Backend Endpoint</div>
+              <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 16px;">
+                Specify the backend server origin URL. In production or deployment on Render, update this to your live Render service URL (e.g. <code>https://trackx.onrender.com</code>).
+              </p>
+
+              <form id="settingsForm">
+                <div class="form-group">
+                  <label class="form-label">Backend REST API Server URL</label>
+                  <input type="url" id="settingApiUrl" class="form-input" placeholder="http://localhost:3000" required>
+                  <small style="font-size: 11px; color: var(--text-dim); margin-top: 4px; display: block;">
+                    Leave default or set to your public deployed server URL so ESP8266 and judges' mobile devices connect seamlessly.
+                  </small>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Active Monitored Device ID</label>
+                  <input type="text" id="settingDeviceId" class="form-input" value="TRACKX-01" required>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                  <button type="submit" class="btn btn-primary">💾 Save Settings</button>
+                  <button type="button" id="btnResetSettings" class="btn btn-secondary">🔄 Reset to Defaults</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Deployment on Render Quick Guide -->
+            <div class="card-panel">
+              <div class="card-title">🚀 Render / Cloud Deployment Guide</div>
+              <div style="font-size: 13px; line-height: 1.6; color: var(--text-muted);">
+                <p style="margin-bottom: 10px;">To deploy TRACKX to <b>Render.com</b> for free hackathon hosting:</p>
+                <ol style="margin-left: 20px; display: flex; flex-direction: column; gap: 8px;">
+                  <li>Push this repository to GitHub.</li>
+                  <li>In Render Dashboard, create a new <b>Web Service</b> and connect your repo.</li>
+                  <li>Set <b>Build Command:</b> <code style="color: var(--accent-cyan); font-family: var(--font-mono);">npm install</code></li>
+                  <li>Set <b>Start Command:</b> <code style="color: var(--accent-cyan); font-family: var(--font-mono);">npm start</code></li>
+                  <li>Copy your resulting Render URL and paste it into the Arduino firmware configuration below!</li>
+                </ol>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: Interactive ESP8266 Arduino Firmware Configurator -->
+          <div>
+            <div class="card-panel">
+              <div class="card-title">
+                <span>⚡ ESP8266 Firmware Code Generator</span>
+                <span class="badge badge-info">Arduino C++</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 14px;">
+                Input your Wi-Fi credentials to automatically generate the configuration block for your NodeMCU firmware:
+              </p>
+
+              <div class="form-group">
+                <label class="form-label">Wi-Fi SSID (Name)</label>
+                <input type="text" id="wifiSsid" class="form-input" placeholder="e.g. Campus_WiFi or Mobile_Hotspot">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Wi-Fi Password</label>
+                <input type="password" id="wifiPass" class="form-input" placeholder="e.g. password123">
+              </div>
+
+              <div style="margin-top: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600;">Arduino IDE Config Snippet:</span>
+                  <button class="btn btn-secondary" style="font-size: 11px; padding: 2px 8px;" onclick="navigator.clipboard.writeText(document.getElementById('firmwareConfigSnippet').textContent); App.showToast('Code copied to clipboard!', 'info');">📋 Copy Code</button>
+                </div>
+                <pre id="firmwareConfigSnippet" style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 11px; color: #a5f3fc; overflow-x: auto; white-space: pre-wrap;"></pre>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Client-side Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/demo.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>

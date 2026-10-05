@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRACKX — Device & Hardware Telemetry</title>
+  <meta name="description" content="Hardware diagnostics, ESP8266 NodeMCU status, NEO-6M GPS metrics, and MPU6050 motion sensor telemetry.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&family=VT323&display=swap" rel="stylesheet">
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Simulated 16x2 I2C LCD Display */
+    .lcd-screen {
+      background: #14532d;
+      border: 4px solid #166534;
+      border-radius: 8px;
+      padding: 14px 20px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.7), 0 0 15px rgba(34,197,94,0.2);
+      font-family: 'VT323', 'Courier New', monospace;
+      color: #86efac;
+      font-size: 26px;
+      letter-spacing: 2.5px;
+      line-height: 1.25;
+      text-shadow: 0 0 4px #86efac;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-logo">🛰️</div>
+        <div class="brand-info">
+          <h1>TRACKX</h1>
+          <span>Smart IoT Safety</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-section-title">Telemetry & Map</div>
+        <a href="/dashboard" class="nav-item">
+          <span class="icon">📊</span> Dashboard
+        </a>
+        <a href="/tracking" class="nav-item">
+          <span class="icon">📍</span> Live Tracking
+        </a>
+        <a href="/navigation" class="nav-item">
+          <span class="icon">🧭</span> Navigation
+        </a>
+
+        <div class="nav-section-title">Safety & Fleet</div>
+        <a href="/history" class="nav-item">
+          <span class="icon">📜</span> Trip History
+        </a>
+        <a href="/alerts" class="nav-item">
+          <span class="icon">🚨</span> Safety & Alerts
+          <span id="sidebarAlertBadge" class="nav-badge danger" style="display: none;">0</span>
+        </a>
+        <a href="/geofence" class="nav-item">
+          <span class="icon">⭕</span> Geofence
+        </a>
+
+        <div class="nav-section-title">Hardware</div>
+        <a href="/device" class="nav-item active">
+          <span class="icon">⚡</span> Device Telemetry
+        </a>
+        <a href="/settings" class="nav-item">
+          <span class="icon">⚙️</span> Settings
+        </a>
+      </nav>
+
+      <div style="padding: 16px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-dim);">
+        <div>Hardware Diagnostics</div>
+        <div style="color: var(--accent-emerald); font-weight: 600; margin-top: 2px;">ESP8266 + MPU6050 + LCD</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      
+      <!-- Top Emergency Banner -->
+      <div id="emergencyBanner" class="emergency-banner">
+        <div class="banner-content">
+          <div class="banner-pulse"></div>
+          <span id="emergencyBannerMsg">EMERGENCY SOS ACTIVE</span>
+        </div>
+        <div class="banner-actions">
+          <button class="banner-btn" onclick="App.acknowledgeBannerAlert()">Acknowledge</button>
+        </div>
+      </div>
+
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+          <div class="page-title">Hardware & Device Telemetry</div>
+        </div>
+
+        <div class="topbar-right">
+          <div id="deviceStatusPill" class="status-pill online">
+            <span class="status-dot"></span> ONLINE
+          </div>
+
+          <div id="topbarClock" class="telemetry-chip" style="font-weight: 600;">
+            12:45:00
+          </div>
+
+          <button id="headerSosBtn" class="sos-header-btn">
+            🚨 SOS
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Device Telemetry Body -->
+      <main class="content-body">
+        
+        <div class="layout-split">
+          
+          <!-- Left Column: Telemetry & LCD Simulation -->
+          <div>
+            
+            <!-- Live Telemetry Card -->
+            <div class="card-panel">
+              <div class="card-title">
+                <span>🛰️ NodeMCU Live Telemetry State</span>
+                <span id="devStatusPillDisplay" class="status-pill online">ONLINE</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Device Identifier</div>
+                  <div id="devIdDisplay" style="font-size: 18px; font-weight: 700; color: #fff; font-family: var(--font-mono); margin-top: 2px;">TRACKX-01</div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">GPS Fix Status</div>
+                  <div style="margin-top: 4px;">
+                    <span id="devGpsStatusDisplay" class="badge badge-success">CONNECTED</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Last Telemetry Ping</div>
+                  <div id="devLastSeenDisplay" style="font-size: 14px; font-weight: 600; color: var(--text-main); margin-top: 2px;">12:45:10 (2s ago)</div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Satellites Tracked</div>
+                  <div id="devSatsDisplay" style="font-size: 16px; font-weight: 700; color: var(--accent-purple); margin-top: 2px;">8 Locked</div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Current Position</div>
+                  <div id="devCoordsDisplay" style="font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--accent-cyan); margin-top: 2px;">21.14580, 79.08820</div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Velocity</div>
+                  <div id="devSpeedDisplay" style="font-size: 16px; font-weight: 700; color: #fff; margin-top: 2px;">32 km/h</div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Battery Status</div>
+                  <div id="devBatteryDisplay" style="font-size: 14px; font-weight: 600; color: var(--accent-emerald); margin-top: 2px;">98% (~4.12V Li-ion)</div>
+                </div>
+
+                <div>
+                  <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase;">Firmware Version</div>
+                  <div id="devFwDisplay" style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">v1.2.0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Simulated 16x2 I2C LCD Display -->
+            <div class="card-panel">
+              <div class="card-title">
+                <span>📟 16x2 I2C LCD Hardware Screen Mirror</span>
+                <span id="lcdScreenBadge" class="badge badge-info">1/5: Status & Speed</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 12px;">
+                Mirroring the physical 16x2 character LCD connected to ESP8266 pins D1 (SCL) and D2 (SDA). The hardware rotates through 5 diagnostic screens every 2.5 seconds:
+              </p>
+
+              <div class="lcd-screen" style="margin-bottom: 12px;">
+                <div id="lcdLine1">TRACKX: ONLINE  </div>
+                <div id="lcdLine2">S:00km/h SATS: 8</div>
+              </div>
+
+              <!-- Screen Carousel Quick Buttons -->
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="DeviceController.setScreen(0)">1. Speed & Sats</button>
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="DeviceController.setScreen(1)">2. Coordinates</button>
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="DeviceController.setScreen(2)">3. Motion / G-Force</button>
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="DeviceController.setScreen(3)">4. Battery & IP</button>
+                <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="DeviceController.setScreen(4)">5. Altitude & Fix</button>
+              </div>
+            </div>
+
+            <!-- Hardware Pinout & Wiring Map Table -->
+            <div class="card-panel">
+              <div class="card-title">
+                <span>🔌 Hardware Pin Connections & Circuit Matrix</span>
+              </div>
+
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Component</th>
+                    <th>ESP8266 Pin</th>
+                    <th>Protocol</th>
+                    <th>Function</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><b>NEO-6M GPS TX</b></td>
+                    <td><code style="color: var(--accent-cyan);">D6 (GPIO 12)</code></td>
+                    <td>UART (SoftwareSerial 9600)</td>
+                    <td>Receives NMEA sentences ($GPRMC, $GPGGA)</td>
+                  </tr>
+                  <tr>
+                    <td><b>NEO-6M GPS RX</b></td>
+                    <td><code style="color: var(--accent-cyan);">D5 (GPIO 14)</code></td>
+                    <td>UART</td>
+                    <td>GPS configuration</td>
+                  </tr>
+                  <tr>
+                    <td><b>MPU6050 SDA & LCD SDA</b></td>
+                    <td><code style="color: var(--accent-emerald);">D2 (GPIO 4)</code></td>
+                    <td>I2C Data Bus</td>
+                    <td>Motion sensor & LCD display data line</td>
+                  </tr>
+                  <tr>
+                    <td><b>MPU6050 SCL & LCD SCL</b></td>
+                    <td><code style="color: var(--accent-emerald);">D1 (GPIO 5)</code></td>
+                    <td>I2C Clock Bus</td>
+                    <td>Motion sensor & LCD clock synchronization</td>
+                  </tr>
+                  <tr>
+                    <td><b>Physical SOS Button</b></td>
+                    <td><code style="color: var(--accent-rose);">D7 (GPIO 13)</code></td>
+                    <td>Digital Input (Pull-Up)</td>
+                    <td>Emergency interrupt signal trigger</td>
+                  </tr>
+                  <tr>
+                    <td><b>Active Buzzer</b></td>
+                    <td><code style="color: var(--accent-amber);">D8 (GPIO 15)</code></td>
+                    <td>Digital Output (PWM)</td>
+                    <td>Audible alarm on SOS or Geofence breach</td>
+                  </tr>
+                  <tr>
+                    <td><b>Green LED (Power/Fix)</b></td>
+                    <td><code style="color: var(--accent-emerald);">D3 (GPIO 0)</code></td>
+                    <td>Digital Output</td>
+                    <td>Solid when Wi-Fi connected, pulses on GPS fix</td>
+                  </tr>
+                  <tr>
+                    <td><b>Red LED (Alarm/SOS)</b></td>
+                    <td><code style="color: var(--accent-rose);">D4 (GPIO 2)</code></td>
+                    <td>Digital Output</td>
+                    <td>Flashes rapidly during SOS emergency state</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          <!-- Right Column: Direct REST Telemetry Testing & Postman Format -->
+          <div>
+            
+            <div class="card-panel">
+              <div class="card-title">📡 Live HTTP POST Tester</div>
+              <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 12px;">
+                ESP8266 sends HTTP POST requests to <code style="color: var(--accent-cyan);">/api/location</code>. You can test directly using this form or curl:
+              </p>
+
+              <div style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
+                <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px;">cURL Hardware Test Command:</div>
+                <pre style="font-family: var(--font-mono); font-size: 11px; color: #a5f3fc; overflow-x: auto; white-space: pre-wrap;">curl -X POST http://localhost:3000/api/location \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceId": "TRACKX-01",
+    "latitude": 21.1458,
+    "longitude": 79.0882,
+    "speed": 32.5,
+    "satellites": 8,
+    "accuracy": 3.2,
+    "motion": "NORMAL"
+  }'</pre>
+              </div>
+
+              <!-- Quick Custom Telemetry Injector -->
+              <form id="customTelemetryForm" onsubmit="event.preventDefault(); injectCustomTelemetry();">
+                <div class="form-group">
+                  <label class="form-label">Latitude</label>
+                  <input type="number" step="any" id="injectLat" class="form-input" value="21.1458" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Longitude</label>
+                  <input type="number" step="any" id="injectLon" class="form-input" value="79.0882" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Speed (km/h)</label>
+                  <input type="number" step="any" id="injectSpeed" class="form-input" value="34.0" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">MPU6050 Motion Status</label>
+                  <select id="injectMotion" class="form-select">
+                    <option value="NORMAL">NORMAL</option>
+                    <option value="ABNORMAL">ABNORMAL (Sudden Acceleration/Tilt)</option>
+                    <option value="POSSIBLE_IMPACT">POSSIBLE_IMPACT (Crash/Impact Spike)</option>
+                  </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                  🚀 Send ESP8266 Telemetry Packet
+                </button>
+              </form>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Client-side Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/demo.js"></script>
+  <script src="/js/device.js"></script>
+  <script>
+    async function injectCustomTelemetry() {
+      const lat = parseFloat(document.getElementById('injectLat').value);
+      const lon = parseFloat(document.getElementById('injectLon').value);
+      const speed = parseFloat(document.getElementById('injectSpeed').value);
+      const motion = document.getElementById('injectMotion').value;
+
+      try {
+        const res = await API.post('/api/location', {
+          deviceId: API.getActiveDeviceId(),
+          latitude: lat,
+          longitude: lon,
+          speed,
+          satellites: 8,
+          accuracy: 2.5,
+          motion
+        });
+
+        if (res.success) {
+          App.showToast(`Telemetry injected! Speed: ${speed} km/h • Motion: ${motion}`, 'info');
+          DeviceController.loadDeviceInfo();
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+  </script>
+</body>
+</html>

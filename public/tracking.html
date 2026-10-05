@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRACKX — Live GPS Tracking & Route Canvas</title>
+  <meta name="description" content="Dedicated high-resolution live map tracking for TRACKX IoT units.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-section">
+        <div class="brand-logo">🛰️</div>
+        <div class="brand-info">
+          <h1>TRACKX</h1>
+          <span>Smart IoT Safety</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-section-title">Telemetry & Map</div>
+        <a href="/dashboard" class="nav-item">
+          <span class="icon">📊</span> Dashboard
+        </a>
+        <a href="/tracking" class="nav-item active">
+          <span class="icon">📍</span> Live Tracking
+        </a>
+        <a href="/navigation" class="nav-item">
+          <span class="icon">🧭</span> Navigation
+        </a>
+
+        <div class="nav-section-title">Safety & Fleet</div>
+        <a href="/history" class="nav-item">
+          <span class="icon">📜</span> Trip History
+        </a>
+        <a href="/alerts" class="nav-item">
+          <span class="icon">🚨</span> Safety & Alerts
+          <span id="sidebarAlertBadge" class="nav-badge danger" style="display: none;">0</span>
+        </a>
+        <a href="/geofence" class="nav-item">
+          <span class="icon">⭕</span> Geofence
+        </a>
+
+        <div class="nav-section-title">Hardware</div>
+        <a href="/device" class="nav-item">
+          <span class="icon">⚡</span> Device Telemetry
+        </a>
+        <a href="/settings" class="nav-item">
+          <span class="icon">⚙️</span> Settings
+        </a>
+      </nav>
+
+      <div style="padding: 16px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-dim);">
+        <div>ESP8266 Live Feed Active</div>
+        <div style="color: var(--accent-emerald); font-weight: 600; margin-top: 2px;">● Polling (2000ms)</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      
+      <!-- Top Emergency Banner -->
+      <div id="emergencyBanner" class="emergency-banner">
+        <div class="banner-content">
+          <div class="banner-pulse"></div>
+          <span id="emergencyBannerMsg">EMERGENCY SOS ACTIVE</span>
+        </div>
+        <div class="banner-actions">
+          <a href="/alerts" class="banner-btn">View Alert</a>
+          <button class="banner-btn" onclick="App.acknowledgeBannerAlert()">Acknowledge</button>
+        </div>
+      </div>
+
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+          <div class="page-title">Live Tracking Canvas</div>
+
+          <div class="device-picker">
+            <span>Unit:</span>
+            <select id="topbarDeviceSelect">
+              <option value="TRACKX-01">TRACKX-01 (NodeMCU)</option>
+              <option value="TRACKX-02">TRACKX-02 (Secondary)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div id="deviceStatusPill" class="status-pill online">
+            <span class="status-dot"></span> ONLINE
+          </div>
+
+          <div id="satellitesChip" class="telemetry-chip">
+            📡 <span>8 SATS</span>
+          </div>
+
+          <div id="topbarClock" class="telemetry-chip" style="font-weight: 600;">
+            12:45:00
+          </div>
+
+          <button id="headerSosBtn" class="sos-header-btn">
+            🚨 SOS
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Tracking Area -->
+      <main class="content-body" style="padding: 16px; display: flex; flex-direction: column;">
+        
+        <!-- Hackathon Demo Bar -->
+        <div class="demo-bar" style="margin-bottom: 12px;">
+          <div class="demo-title">
+            <span>🧪 Demo Simulator</span>
+          </div>
+          <div class="demo-actions">
+            <button id="demoStepBtn" class="demo-btn">⏭️ Step Point</button>
+            <button id="demoAutoPlayBtn" class="demo-btn">▶️ Auto-Drive</button>
+            <button id="demoBreachBtn" class="demo-btn btn-warning">⚠️ Geofence Breach</button>
+            <button id="demoImpactBtn" class="demo-btn btn-danger">💥 Impact</button>
+            <button id="demoSosBtn" class="demo-btn btn-danger">🚨 SOS</button>
+            <button id="demoResetBtn" class="demo-btn">🔄 Reset</button>
+          </div>
+        </div>
+
+        <!-- Full-Viewport Map Container with Floating HUD -->
+        <div class="map-container full-height" style="position: relative;">
+          
+          <!-- Top Floating HUD -->
+          <div class="map-hud">
+            <div class="hud-item">
+              <span class="hud-label">Speed</span>
+              <span id="hudSpeed" class="hud-value" style="color: var(--accent-cyan);">0 km/h</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">GPS Lat, Lon</span>
+              <span id="hudCoords" class="hud-value">21.1458, 79.0882</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Satellites</span>
+              <span id="hudSats" class="hud-value">8 Fix</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Accuracy</span>
+              <span id="hudAcc" class="hud-value">±2.8m</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Motion</span>
+              <span id="hudMotion" class="hud-value" style="color: var(--accent-emerald);">NORMAL</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Last Ping</span>
+              <span id="hudTime" class="hud-value">12:45:00</span>
+            </div>
+          </div>
+
+          <!-- Bottom Floating Map Controls -->
+          <div class="map-controls-floating">
+            <button id="btnToggleFollow" class="map-float-btn" title="Toggle Auto-Follow Center" style="color: var(--accent-cyan);">
+              🎯
+            </button>
+            <button id="btnFitBounds" class="map-float-btn" title="Fit Entire Route Trail">
+              🔍
+            </button>
+            <button id="btnToggleGeofence" class="map-float-btn" title="Toggle Geofence Safe Zone Overlay" style="color: var(--accent-emerald);">
+              ⭕
+            </button>
+            <button id="btnClearTrail" class="map-float-btn" title="Clear Visual Path Line">
+              🗑️
+            </button>
+          </div>
+
+          <!-- Leaflet Map Div -->
+          <div id="trackingMap" style="width: 100%; height: 100%;"></div>
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Client-side Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/demo.js"></script>
+  <script src="/js/tracking.js"></script>
+</body>
+</html>
